@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Inline shell (!)",
+    "description": "Start a message with ! to run a shell command in the conversation's workspace instead of sending that text to the model. The command and its output become the conversation entry, so you and the agent read the same running result.",
+    "detail": "docs/DETAIL.md"
+  }
+}

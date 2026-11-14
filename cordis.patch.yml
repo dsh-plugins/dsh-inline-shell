@@ -1,0 +1,3 @@
+- insert:
+    - id: inline-shell
+      name: '@dsh-plugin/dsh-inline-shell'
