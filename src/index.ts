@@ -26,6 +26,11 @@ export interface InlineShellConfig {
    * turn so the agent reads the entry immediately and may comment on it.
    */
   readonly turn?: 'none' | 'model'
+  /**
+   * `full` (default) runs the command outside the conversation's sandbox, as the
+   * Codex CLI's `!` does; `session` keeps the composer's permission preset.
+   */
+  readonly sandbox?: 'full' | 'session'
 }
 
 /**
@@ -34,6 +39,9 @@ export interface InlineShellConfig {
  * @param config - the row's configuration.
  */
 export function apply(ctx: HostContext, config?: InlineShellConfig): void {
-  const options: InlineShellOptions = { turn: config?.turn === 'model' ? 'model' : 'none' }
+  const options: InlineShellOptions = {
+    turn: config?.turn === 'model' ? 'model' : 'none',
+    sandbox: config?.sandbox === 'session' ? 'session' : 'full',
+  }
   installInlineShell(ctx, options)
 }

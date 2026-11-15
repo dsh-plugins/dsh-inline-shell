@@ -53,17 +53,19 @@ result, and the row renders inline — at the cost of one model request per comm
 - id: inline-shell
   name: '@dsh-plugin/dsh-inline-shell'
   config:
-    turn: model
+    turn: model      # keep the turn so the row renders inline
+    sandbox: session # obey the composer's permission preset instead of running with full access
 ```
 
 ### What the command runs under
 
-The command runs through the profile's shell executor (`ctx.shell`) in the Session working directory, under the
-same sandbox policy as a command the agent issues. A profile whose default preset is `danger-full-access` runs
-commands unconfined, which is what the Desktop app does; a sandboxed profile keeps its confinement, and a sandbox
-backend that cannot start refuses the command rather than silently running it unconfined.
+The command runs through the profile's shell executor (`ctx.shell`) in the Session working directory, and by default
+confinement is **bypassed**: the human typed it, so it is the conversation's explicit full-access escape hatch, the
+same choice the Codex CLI makes for `!`. The composer's permission selector therefore does not narrow or block it,
+and no approval prompt appears.
 
-There is no approval prompt: the human typed the command, and the command is the message.
+Set `sandbox: session` to keep the preset instead, which runs the command inside the conversation's own sandbox and
+lets the backend refuse a mode it cannot enforce.
 
 -----
 
@@ -181,7 +183,6 @@ again on retry: the same message identity reuses the settled entry.
   request for the session's first prompt; that is not an agent turn and can be disabled in the profile.
 - **One command per message.** A message is a command only when it is a single text block starting with `!`; an
   attachment-carrying message is delivered unchanged.
-- **Session sandbox, not the Codex full-access escape hatch.** Codex runs `!` commands with sandboxing disabled;
-  this plugin inherits the profile's policy, because a plugin that silently widened its own authority would be
-  lying about the conversation's sandbox.
+- **Full access is the default, on purpose.** Like the Codex CLI's `!`, a typed command runs with confinement
+  bypassed; `sandbox: session` restores the preset, which then behaves exactly like an agent-issued command.
 - **No streaming.** The row appears when the command settles; a long command shows nothing until it finishes.

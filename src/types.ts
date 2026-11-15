@@ -13,6 +13,7 @@ export interface ShellExecRequest {
   timeoutMs?: number
   stdoutMaxBytes?: number
   signal?: AbortSignal
+  sandboxPolicy?: unknown
 }
 
 /** `ShellExecSpec` subset: the resolved request the executor accepts. */
@@ -44,8 +45,15 @@ export interface ShellExecution {
 
 /** `ctx.shell` (`ShellExecutor`): resolve a request, then execute the spec. */
 export interface ShellService {
+  /** The mounted executor's own sandbox mode; absent means it does not confine. */
+  readonly sandboxMode?: string
   resolve(request: ShellExecRequest): ShellExecSpec
   execute(spec: ShellExecSpec): Promise<ShellExecution>
+}
+
+/** `ctx.sandboxPolicy` subset: one session's complete standing enforcement policy. */
+export interface SandboxPolicyService {
+  resolve(options: { session?: SessionLike; mode?: string }): unknown
 }
 
 /** `ctx.workingDirectory` subset: the Session's effective directory. */
@@ -119,6 +127,7 @@ export interface AgentLike {
 export interface HostContext {
   readonly shell: ShellService
   readonly workingDirectory: WorkingDirectoryService
+  get(service: 'sandboxPolicy'): SandboxPolicyService | undefined
   effect(callback: () => () => void, label?: string): () => void
   on(event: 'agent/created', listener: (payload: { readonly agent: AgentLike }) => void): () => void
   on(event: 'agent/disposed', listener: (payload: { readonly agent: AgentLike }) => void): () => void

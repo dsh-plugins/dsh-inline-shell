@@ -37,10 +37,9 @@ and the row renders inline, at the cost of one model request per command.
 
 ## What to expect
 
-- The command runs in the Session working directory through the profile's shell executor, under the same sandbox
-  policy as an agent-issued command. A profile with the `danger-full-access` default preset (the Desktop app)
-  runs them unconfined; a sandboxed profile keeps its confinement and refuses to run the command when its sandbox
-  backend cannot start.
+- The command runs in the Session working directory through the profile's shell executor, with confinement bypassed
+  by default: your typed command is the conversation's full-access escape hatch, so the permission selector neither
+  narrows nor blocks it. `sandbox: session` makes it obey the preset instead.
 - There is no approval prompt: the command is the message you typed.
 - Output is bounded: 256 KiB captured from stdout, 12,000 characters rendered with `[output truncated]`, and a
   120-second deadline that reports `Exit code: -1` with `command timed out`.
@@ -50,8 +49,8 @@ and the row renders inline, at the cost of one model request per command.
 
 ## Limits
 
-- The Web composer has no submission hook for a `!` line, so the prefix is handled after the message is sent. Your
-  original `!` line stays in the transcript and in model history next to the recorded result.
+- The Web composer has no submission hook for a `!` line, so the prefix is handled after the message is sent. The
+  recorded entry is the transcript record of the run; your raw `!` line is not kept.
 - Nothing streams while the command runs; the row appears when the command settles.
-- The plugin follows the profile's sandbox rather than disabling confinement the way the Codex CLI does for its
-  own `!` escape.
+- The row is recorded under the turn that the message opened, which Chat folds into a collapsed group when the run
+  spends no model request.

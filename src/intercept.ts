@@ -31,6 +31,11 @@ export interface InlineShellOptions {
    * is why the visible-row mode is the one that spends a request.
    */
   readonly turn: 'none' | 'model'
+  /**
+   * `full` runs the command outside the conversation's sandbox, as the Codex CLI
+   * does for `!`; `session` keeps the composer's permission preset.
+   */
+  readonly sandbox: 'full' | 'session'
 }
 
 /**
@@ -99,7 +104,7 @@ function createListener(
 
     const entries: UserMessageLike[] = []
     for (const { message, command } of commands) {
-      entries.push(await entryMessage(ctx, agent, cache, message, command, payload.signal))
+      entries.push(await entryMessage(ctx, agent, cache, message, command, payload.signal, options.sandbox))
     }
 
     if (!carriesModelInput && payload.step === 1 && options.turn === 'none') {
@@ -160,10 +165,11 @@ async function entryMessage(
   message: UserMessageLike,
   command: string,
   signal: AbortSignal,
+  sandbox: 'full' | 'session',
 ): Promise<UserMessageLike> {
   const entry = command === ''
     ? usageEntry()
-    : await settledEntry(ctx, agent, cache, message.id, command, signal)
+    : await settledEntry(ctx, agent, cache, message.id, command, signal, sandbox)
   return {
     id: randomUUID(),
     role: 'user',
@@ -190,10 +196,11 @@ function settledEntry(
   messageId: string,
   command: string,
   signal: AbortSignal,
+  sandbox: 'full' | 'session',
 ): Promise<ShellEntry> {
   const cached = cache.get(messageId)
   if (cached !== undefined) return cached
-  const pending = runInlineShell(ctx, agent, command, signal)
+  const pending = runInlineShell(ctx, agent, command, signal, sandbox)
   cache.set(messageId, pending)
   return pending
 }
