@@ -83,7 +83,7 @@ export type PreStepDecisionLike =
     readonly startsRequestSeries?: true
   }
 
-/** Payload of one `agent/pre-step` waterfall call. */
+/** Payload of one `agent/pre-step` waterfall call. `step` is 1-based. */
 export interface PreStepPayload {
   readonly messages: readonly UserMessageLike[]
   readonly turn: number
@@ -103,10 +103,16 @@ export interface AgentScope {
   on(event: 'agent/pre-step', listener: PreStepListener): () => void
 }
 
+/** `Session.append` subset: recording one already-identified user message. */
+export interface SessionLike {
+  append(type: 'user/message', data: UserMessageLike, opts: { surfaceOp: 'append' }): unknown
+}
+
 /** One live agent as far as the plugin addresses it. */
 export interface AgentLike {
   readonly id: string
   readonly ctx: AgentScope
+  readonly session: SessionLike
 }
 
 /** Host context face: the services plus the lifecycle events used here. */

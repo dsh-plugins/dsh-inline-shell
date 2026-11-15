@@ -28,7 +28,12 @@ hello
 </user_shell_command>
 ```
 
-The agent receives the same fragment in the same step, so asking about the result needs no second turn.
+The agent receives the same fragment at its next step, so asking about the result needs one prompt — the run itself
+costs no model turn and no tokens.
+
+Chat folds a turn that took no step into a collapsed group, so the recorded row sits under that group's disclosure.
+Set `turn: model` in the plugin row's `config` to keep the turn instead: the agent reads the entry in that same step
+and the row renders inline, at the cost of one model request per command.
 
 ## What to expect
 

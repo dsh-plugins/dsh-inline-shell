@@ -1,13 +1,14 @@
 /**
- * Host-half wiring: the `!` prefix reaches the model plane as an appended
- * pre-step message.
+ * Host-half wiring: the `!` prefix reaches the model plane as a recorded
+ * conversation entry.
  *
  * The Web composer submits an ordinary message, so the only place the
  * conversation can turn one into a shell command is the agent's pre-step
  * waterfall: it owns the batch that becomes the model request and, at the same
  * time, the `user/message` events the Chat renders. This plugin runs the command
- * and appends a context entry that carries the command and its output, so the
- * human and the model read the same record in the same step.
+ * and records the entry itself, then enters the step with no messages — the
+ * loop's documented "no model call" turn — so a shell command costs no model
+ * turn and the agent reads the result at its next step.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -21,17 +22,29 @@ import type {
 /** Settled entries per Session, keyed by the message identity that produced them. */
 type EntryCache = Map<string, Promise<ShellEntry>>
 
+/** Which delivery a `!` command takes. */
+export interface InlineShellOptions {
+  /**
+   * `none` records the entry and closes the turn without a model request;
+   * `model` keeps the turn so the agent reads the entry in that same step and can
+   * comment on it. Chat folds a no-step turn's rows into a collapsed group, which
+   * is why the visible-row mode is the one that spends a request.
+   */
+  readonly turn: 'none' | 'model'
+}
+
 /**
  * Register the pre-step listener for every agent created while the plugin is
  * loaded, and drop it again when that agent is disposed or the plugin unloads.
  * @param ctx - owning host context.
+ * @param options - delivery mode for a command-only batch.
  */
-export function installInlineShell(ctx: HostContext): void {
+export function installInlineShell(ctx: HostContext, options: InlineShellOptions): void {
   const listeners = new Map<AgentLike, () => void>()
   ctx.on('agent/created', ({ agent }) => {
     const cache: EntryCache = new Map()
     const dispose = agent.ctx.effect(
-      () => agent.ctx.on('agent/pre-step', createListener(ctx, agent, cache)),
+      () => agent.ctx.on('agent/pre-step', createListener(ctx, agent, cache, options)),
       'inline-shell: pre-step',
     )
     listeners.set(agent, dispose)
@@ -48,25 +61,64 @@ export function installInlineShell(ctx: HostContext): void {
 
 /**
  * Build the pre-step listener of one agent.
+ *
+ * A batch made only of shell commands never reaches the model: the commands run,
+ * their entries are recorded as ordinary `user/message` events, and the step is
+ * rejected. Rejection is the one decision every other pre-step listener passes
+ * through unchanged, and the loop closes the turn without a step and without a
+ * request. A batch that also carries input meant for the model keeps the turn and
+ * enters with the entries appended, so the model reads them in that same step.
  * @param ctx - owning host context.
  * @param agent - agent whose steps the listener sees.
  * @param cache - settled entries of this agent's Session.
+ * @param options - delivery mode for a command-only batch.
  * @returns the waterfall listener.
  */
-function createListener(ctx: HostContext, agent: AgentLike, cache: EntryCache): PreStepListener {
+function createListener(
+  ctx: HostContext,
+  agent: AgentLike,
+  cache: EntryCache,
+  options: InlineShellOptions,
+): PreStepListener {
   return async (payload, next): Promise<PreStepDecisionLike> => {
     const decision = await next()
     if (decision.kind !== 'enter') return decision
+    const commands: { message: UserMessageLike; command: string }[] = []
+    let carriesModelInput = false
+    for (const message of decision.messages) {
+      const command = commandOf(message)
+      if (command !== undefined) {
+        commands.push({ message, command })
+        continue
+      }
+      // Injected context (runtime context, skill catalogs) joins every batch and
+      // does not make the step need a model call; only a human prompt does.
+      if (message.source.kind === 'user') carriesModelInput = true
+    }
+    if (commands.length === 0) return decision
+
+    const entries: UserMessageLike[] = []
+    for (const { message, command } of commands) {
+      entries.push(await entryMessage(ctx, agent, cache, message, command, payload.signal))
+    }
+
+    if (!carriesModelInput && payload.step === 1 && options.turn === 'none') {
+      for (const entry of entries) {
+        agent.session.append('user/message', entry, { surfaceOp: 'append' })
+      }
+      return { kind: 'reject' }
+    }
+
     const messages: UserMessageLike[] = []
-    let appended = false
+    let nextEntry = 0
     for (const message of decision.messages) {
       messages.push(message)
-      const command = commandOf(message)
-      if (command === undefined) continue
-      messages.push(await entryMessage(ctx, agent, cache, message, command, payload.signal))
-      appended = true
+      if (commandOf(message) === undefined) continue
+      const entry = entries[nextEntry]
+      nextEntry += 1
+      if (entry !== undefined) messages.push(entry)
     }
-    return appended ? { ...decision, messages } : decision
+    return { ...decision, messages }
   }
 }
 

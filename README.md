@@ -38,9 +38,23 @@ records the run as a conversation entry:
 
 - The collapsed row names the run the way the Codex CLI's cell does: `You ran echo hello · exit 0`.
 - Expanding the row shows the model-facing fragment with the exit code, duration, and output.
-- The agent receives that fragment in the same step, so it can answer about the result immediately.
+- **No model turn is started by default.** The command costs no request and no tokens; the agent reads the recorded
+  entry at its next step, and answers then if the conversation calls for it.
 
 A bare `!` records a usage note instead of running anything.
+
+### Choosing whether the run starts a turn
+
+Chat folds a turn that took no step into a collapsed group, so the recorded row sits behind that group's
+disclosure. Set `turn: model` to keep the turn instead: the agent reads the entry in that same step, comments on the
+result, and the row renders inline — at the cost of one model request per command.
+
+```yaml
+- id: inline-shell
+  name: '@dsh-plugin/dsh-inline-shell'
+  config:
+    turn: model
+```
 
 ### What the command runs under
 
@@ -60,15 +74,16 @@ There is no approval prompt: the human typed the command, and the command is the
    (its command plane only adjudicates lines that start with `/`).
 
 2. The plugin listens on the agent's `agent/pre-step` waterfall. A message whose single text block starts with `!`
-   is matched, the command is executed once per message identity, and a second user-role message is appended to
-   the step batch.
+   is matched and the command is executed once per message identity.
 
-3. That appended message carries `source: { kind: 'inline-shell', form: 'notice', summary }`. Chat renders any
-   non-`user` source as an injected-context row, so the entry appears beside the human's own `!` line with a
-   one-line summary and an expandable body.
+3. When the batch carries nothing else for the model, the plugin records the entry itself as a `user/message` and
+   rejects the step. Rejection is the one decision every other pre-step listener passes through unchanged, and the
+   loop closes the turn without a step and without a request, so the command never reaches the provider.
+   `turn: model` skips the rejection and enters the step with the entry appended instead.
 
-4. The loop commits both messages as `user/message` events before the request is built, so the entry is durable,
-   replayable, and model-visible in the same step.
+4. The recorded message carries `source: { kind: 'inline-shell', form: 'notice', summary }`. Chat renders any
+   non-`user` source as an injected-context row, so the entry appears with a one-line summary and an expandable
+   body; the fragment inside it is what the model reads at its next step.
 
 -----
 
@@ -99,7 +114,11 @@ web`), a profile that mounted the bundle from this checkout, and Playwright/Chro
 - `!echo inline-shell-ok` produces the `inline-shell` context row with `You ran echo inline-shell-ok · exit 0`;
   expanding it shows the `<user_shell_command>` fragment with `Exit code: 0`, `Duration: 0.7100 seconds`, and
   `inline-shell-ok`.
-- The agent answers about that result in the same turn without another prompt.
+- The run starts no model turn: the chat gains no assistant message, and Trajectory shows Turn 1 with context
+  entries only and an empty Model lane.
+- The recorded row is reachable under the turn's collapsed group and reads `You ran echo … · exit 0`.
+- The next prompt still sees the run: asking "What did the last shell command print?" answers with the recorded
+  output, so the entry reaches the model at its next step.
 - A bare `!` records the usage entry and runs nothing; a message without the prefix adds no entry and reaches the
   model as ordinary input.
 - Plugins shows the bundle as `Inline shell (!)` with its description and icon, and its detail page renders
@@ -135,23 +154,31 @@ Stderr follows stdout under a `[stderr]` label. A run cut short reports `Exit co
 (`command aborted`, `command timed out`, `killed by <signal>`). A command the executor could not start reports
 `command failed to run: <reason>`.
 
-The model also sees the human's original `!echo hello` line, because the composer message is preserved.
+The command's own message is not kept: the recorded entry replaces it, so the transcript holds one row per run
+rather than a `!` line plus a result.
 
 ### Token effect
 
-One command adds its fragment (at most roughly 12,000 output characters) once. The entry is durable, so later
-steps and later turns reread it from the Session log rather than re-running the command.
+No request is made for the command itself. Its fragment (at most roughly 12,000 output characters) enters the
+model's history once, at the next step the agent takes, and later turns reread it from the Session log rather than
+re-running the command.
 
 ### KV Cache effect
 
-The appended message changes the request prefix from the step it enters onward. The command does not run again on
-retry: the same message identity reuses the settled entry.
+The entry joins the request prefix at the model's next step, not while the command runs. The command does not run
+again on retry: the same message identity reuses the settled entry.
 
 ## Known Limitations and Deferred Work
 
 - **The prefix cannot be claimed in the composer.** The client submit machine only adjudicates `/` lines and the
-  trigger pipeline accepts `/` and `@`, so `!` is handled after the human sends it. The consequence is that the
-  human's raw `!` line stays in the transcript and in model history next to the recorded result.
+  trigger pipeline accepts `/` and `@`, so `!` is handled after the human sends it; the run therefore costs a
+  `turn/start`/`turn/end` pair, but no step and no provider request.
+- **The quiet mode hides the row one disclosure deep.** A turn with no step is folded into a collapsed group, so the
+  recorded entry sits under it; `turn: model` renders the row inline for one request per command.
+- **No immediate comment.** In the default mode the agent says nothing about the result until its next step; a
+  reader who wants an explanation asks in the next prompt.
+- **Session titles are a separate call.** The profile's session-title generator may still make its own small
+  request for the session's first prompt; that is not an agent turn and can be disabled in the profile.
 - **One command per message.** A message is a command only when it is a single text block starting with `!`; an
   attachment-carrying message is delivered unchanged.
 - **Session sandbox, not the Codex full-access escape hatch.** Codex runs `!` commands with sandboxing disabled;
