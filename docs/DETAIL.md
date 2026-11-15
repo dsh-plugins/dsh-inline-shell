@@ -11,8 +11,8 @@ Send a message that begins with `!`:
 !echo hello
 ```
 
-The conversation gains an `inline-shell` context row that reads `echo hello → exit 0`. Select the row to expand the
-exact text the agent received:
+The conversation gains an `inline-shell` context row that reads `You ran echo hello · exit 0`. Select the row to
+expand the exact text the agent received:
 
 ```text
 <user_shell_command>

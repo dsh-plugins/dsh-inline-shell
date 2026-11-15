@@ -58,6 +58,11 @@ function statusOf(result: ShellRunResult): string {
   return `exit ${exitCodeOf(result)}`
 }
 
+/** The collapsed row's one-line account, in the Codex CLI's "You ran <command>" wording. */
+function summaryOf(command: string, status: string): string {
+  return `You ran ${command} · ${status}`
+}
+
 /**
  * Render one settled run as the model-facing fragment.
  * @param command - exact command text the user submitted after the prefix.
@@ -89,7 +94,7 @@ export function fragment(command: string, result: ShellRunResult, durationMs: nu
  * @returns model-facing text and the collapsed row summary.
  */
 export function entryOf(command: string, result: ShellRunResult, durationMs: number): ShellEntry {
-  return { text: fragment(command, result, durationMs), summary: `${command} → ${statusOf(result)}` }
+  return { text: fragment(command, result, durationMs), summary: summaryOf(command, statusOf(result)) }
 }
 
 /**
@@ -114,7 +119,7 @@ export function failureEntry(command: string, error: unknown): ShellEntry {
       '</result>',
       '</user_shell_command>',
     ].join('\n'),
-    summary: `${command} → failed`,
+    summary: summaryOf(command, 'failed'),
   }
 }
 
@@ -124,8 +129,7 @@ export function failureEntry(command: string, error: unknown): ShellEntry {
  */
 export function usageEntry(): ShellEntry {
   return {
-    text: 'No command was given. The ! prefix runs the rest of the message as a shell command in this conversation, '
-      + 'for example: !echo hello',
-    summary: 'no command given',
+    text: 'Prefix a command with ! to run it locally, for example: !echo hello',
+    summary: 'Prefix a command with ! to run it locally',
   }
 }

@@ -6,8 +6,8 @@ English | [中文](README.zh.md)
 
 Type a message that starts with `!` in any conversation and the rest of it runs as a shell command instead of
 going to the model. The command and its output become a durable conversation entry, so you and the agent read the
-same record: the transcript grows an `inline-shell` context row (`echo hello → exit 0`) that expands to the exact
-text the model received, and that text enters the next model request in the same step.
+same record: the transcript grows an `inline-shell` context row (`You ran echo hello · exit 0`) that expands to the
+exact text the model received, and that text enters the next model request in the same step.
 
 The behavior follows the OpenAI Codex CLI's `!` shell escape: the same `<user_shell_command>` fragment shape, the
 same "run where the conversation runs" rule, and the same idea that a command the human typed is conversation
@@ -36,7 +36,7 @@ open any conversation and send:
 The composer submits it like any other message. The Host runs `echo hello` in the Session working directory, then
 records the run as a conversation entry:
 
-- The collapsed row shows the command and its outcome: `echo hello → exit 0`.
+- The collapsed row names the run the way the Codex CLI's cell does: `You ran echo hello · exit 0`.
 - Expanding the row shows the model-facing fragment with the exit code, duration, and output.
 - The agent receives that fragment in the same step, so it can answer about the result immediately.
 
@@ -96,8 +96,9 @@ with `[output truncated]`, and a command that exceeds 120 seconds is killed and 
 The delivered bundle was exercised in a live Web UI launched with an isolated `DSH_HOME` (`dsh --profile inline-e2e
 web`), a profile that mounted the bundle from this checkout, and Playwright/Chromium driving the page. Verified:
 
-- `!echo inline-shell-ok` produces the `inline-shell` context row with `echo inline-shell-ok → exit 0`; expanding it
-  shows the `<user_shell_command>` fragment with `Exit code: 0`, `Duration: 0.7100 seconds`, and `inline-shell-ok`.
+- `!echo inline-shell-ok` produces the `inline-shell` context row with `You ran echo inline-shell-ok · exit 0`;
+  expanding it shows the `<user_shell_command>` fragment with `Exit code: 0`, `Duration: 0.7100 seconds`, and
+  `inline-shell-ok`.
 - The agent answers about that result in the same turn without another prompt.
 - A bare `!` records the usage entry and runs nothing; a message without the prefix adds no entry and reaches the
   model as ordinary input.

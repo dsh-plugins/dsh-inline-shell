@@ -10,7 +10,7 @@
 !echo hello
 ```
 
-对话中会出现一行 `inline-shell` 上下文条目，显示 `echo hello → exit 0`。点击该行可展开 agent 实际收到的原文：
+对话中会出现一行 `inline-shell` 上下文条目，显示 `You ran echo hello · exit 0`。点击该行可展开 agent 实际收到的原文：
 
 ```text
 <user_shell_command>
