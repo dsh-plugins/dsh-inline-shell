@@ -22,7 +22,8 @@ import type {
 type EntryCache = Map<string, Promise<ShellEntry>>
 
 /**
- * Register the pre-step listener for every agent, present and future.
+ * Register the pre-step listener for every agent created while the plugin is
+ * loaded, and drop it again when that agent is disposed or the plugin unloads.
  * @param ctx - owning host context.
  */
 export function installInlineShell(ctx: HostContext): void {

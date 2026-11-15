@@ -91,6 +91,22 @@ Output is bounded: stdout is capped at 256 KiB at the executor, the rendered out
 with `[output truncated]`, and a command that exceeds 120 seconds is killed and reported as `Exit code: -1` with
 `command timed out`.
 
+## Verification
+
+The delivered bundle was exercised in a live Web UI launched with an isolated `DSH_HOME` (`dsh --profile inline-e2e
+web`), a profile that mounted the bundle from this checkout, and Playwright/Chromium driving the page. Verified:
+
+- `!echo inline-shell-ok` produces the `inline-shell` context row with `echo inline-shell-ok → exit 0`; expanding it
+  shows the `<user_shell_command>` fragment with `Exit code: 0`, `Duration: 0.7100 seconds`, and `inline-shell-ok`.
+- The agent answers about that result in the same turn without another prompt.
+- A bare `!` records the usage entry and runs nothing; a message without the prefix adds no entry and reaches the
+  model as ordinary input.
+- Plugins shows the bundle as `Inline shell (!)` with its description and icon, and its detail page renders
+  `docs/DETAIL.md`.
+
+Not verified: the display in a second locale, and the attachment path (a message carrying attachments is delivered
+unchanged by design).
+
 -----
 
 <a id="model-experience"></a>
